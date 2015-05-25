@@ -1,45 +1,3 @@
-(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-var $;
-
-$ = require('./jquery.js');
-
-(function(win, doc) {
-  'use strict';
-  var AppModel, model;
-  AppModel = (function() {
-    function AppModel() {
-      this.url = 'https://api.apigw.smt.docomo.ne.jp/dialogue/v2/dialogue';
-      this.apiKey = '6c612e594d5a32557748352e6b496a6a5031492f6631634c4f6d6d682e7674375635552f6e48304b667a37';
-      this.initialize();
-    }
-
-    AppModel.prototype.initialize = function(name) {
-      this.name = name != null ? name : 'Hello World!';
-      return this.fetch('こんにちは');
-    };
-
-    AppModel.prototype.fetch = function(text) {
-      return $.ajax({
-        type: 'POST',
-        url: this.url,
-        dataType: 'json',
-        data: {
-          APIKEY: this.apiKey,
-          utt: text,
-          context: ''
-        }
-      });
-    };
-
-    return AppModel;
-
-  })();
-  return model = new AppModel();
-})(window, window.document);
-
-
-
-},{"./jquery.js":2}],2:[function(require,module,exports){
 /*!
  * jQuery JavaScript Library v2.1.4
  * http://jquery.com/
@@ -9250,5 +9208,3 @@ if ( typeof noGlobal === strundefined ) {
 return jQuery;
 
 }));
-
-},{}]},{},[1]);
