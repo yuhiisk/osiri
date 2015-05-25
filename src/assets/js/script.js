@@ -8,8 +8,8 @@ $ = require('./jquery.js');
   var AppModel, model;
   AppModel = (function() {
     function AppModel() {
-      this.url = 'https://api.apigw.smt.docomo.ne.jp/dialogue/v2/dialogue';
       this.apiKey = '6c612e594d5a32557748352e6b496a6a5031492f6631634c4f6d6d682e7674375635552f6e48304b667a37';
+      this.url = 'https://api.apigw.smt.docomo.ne.jp/dialogue/v1/dialogue?APIKEY=' + this.apiKey;
       this.initialize();
     }
 
@@ -24,9 +24,7 @@ $ = require('./jquery.js');
         url: this.url,
         dataType: 'json',
         data: {
-          APIKEY: this.apiKey,
-          utt: text,
-          context: ''
+          utt: text
         }
       });
     };
