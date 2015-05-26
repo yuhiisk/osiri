@@ -5,6 +5,8 @@ do (win = window, doc = window.document) ->
 
     'use strict'
 
+    CONTEXT = ''
+
     ###
     # Model
     ###
@@ -60,14 +62,18 @@ do (win = window, doc = window.document) ->
 
     class AppModel extends Events
 
-        constructor: (profile) ->
+        constructor: (profile, special) ->
             super()
             @data =
                 context: ''
             @profile = profile
+            @special = _.shuffle(special)
 
             @apiKey = '6c612e594d5a32557748352e6b496a6a5031492f6631634c4f6d6d682e7674375635552f6e48304b667a37'
             @url = 'https://api.apigw.smt.docomo.ne.jp/dialogue/v1/dialogue?APIKEY=' + @apiKey
+
+            @count = 0
+            @max = 3
 
             @initialize()
 
@@ -84,7 +90,7 @@ do (win = window, doc = window.document) ->
             )
 
         fetch: (text) ->
-            postData = _.extend(@profile, { utt: text, context: @data.context })
+            postData = _.extend(@profile, { utt: text, context: CONTEXT })
 
             $.ajax(
                 type: 'post'
@@ -94,6 +100,7 @@ do (win = window, doc = window.document) ->
                 data: JSON.stringify(postData)
             ).done((data) =>
                 @data = data
+                CONTEXT = data.context
                 @emit('fetch', data)
             )
 
@@ -104,12 +111,20 @@ do (win = window, doc = window.document) ->
             else if @profile.sex is "男"
                 sex = '1'
 
+            @count++
+            if @count is 3 and @special.length > 0
+                @count = 0
+                text = @special[@rand(1, @special.length)]
+                @data.utt = text
+                CONTEXT = ''
+
             @synth.synth(@data.utt, sex)
 
         say: (blob) ->
             @voice.set(blob).play()
 
-
+        rand: (min, max) ->
+            return min + Math.floor(Math.random() * (max + 1 - min))
 
     class AudioPlayer extends Events
 
@@ -205,10 +220,22 @@ do (win = window, doc = window.document) ->
         place: '横浜'
         mode: 'dialog'
         t: '30'
-    )
+    , [
+        '好きです',
+        'どうして、そんなにおれの好きな顔に生まれてきたの？',
+        'たまには俺にリードさせてくださいよ。',
+        'カナちゃんが彼女になってよ。',
+        'いいから俺についてこい。',
+        '俺にしとけば？',
+        'もう、ほっとけないなー。',
+        '守ってあげたいタイプってよく言われない？',
+        '僕のものになってください！',
+        '毎朝俺のために味噌汁を作ってください。',
+        '俺と夜の大運動会で棒入れをしないかい？',
+    ])
     female = new AppModel(
-        nickname: 'いそっぷ'
-        nickname_y: 'イソップ'
+        nickname: '倉科カナ'
+        nickname_y: 'カナチャン'
         sex: '女'
         bloodtype: 'A'
         birthdateY: '1985'
@@ -219,7 +246,7 @@ do (win = window, doc = window.document) ->
         place: '東京'
         mode: 'dialog'
         t: ''
-    )
+    , [])
 
     inputView.on('submit', (e) ->
         chatView.add(e)
