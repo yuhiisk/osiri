@@ -8,12 +8,63 @@ do (win = window, doc = window.document) ->
     ###
     # Model
     ###
-    class AppModel extends Events
+    class SpeechSynth extends Events
 
         constructor: ->
             super()
             @data =
+                blob: null
+
+            @apiKey = '6c612e594d5a32557748352e6b496a6a5031492f6631634c4f6d6d682e7674375635552f6e48304b667a37'
+            @url = 'https://api.apigw.smt.docomo.ne.jp/virtualNarrator/v1/textToSpeech?APIKEY=' + @apiKey
+
+            @initialize()
+
+        initialize: ->
+
+        synth: (text, sex) ->
+            # console.log sex
+            self = @
+            postData =
+                Command: "AP_Synth"
+                TextData: text
+                SpeakerID: sex
+                SpeechRate: '1.00'
+                PowerRate: '1.00'
+                VoiceType: '0'
+                AudioFileFormat: '0'
+
+
+            xhr = new XMLHttpRequest()
+            xhr.open('POST', @url, true)
+
+            #------- [1] -------
+            xhr.responseType = 'arraybuffer'
+
+            xhr.setRequestHeader("Content-Type", "application/json; charset=utf-8")
+
+            xhr.onload = ->
+                if @readyState == 4 and this.status == 200
+                    #------- [2] -------
+                    view = new Uint8Array(@response)
+
+                    #------- [3] -------
+                    blob = new Blob([view], { "type" : "audio/wav" })
+                    self.data.blob = blob
+                    self.emit('synth', blob)
+
+                    #------- [4] -------
+
+            xhr.send(JSON.stringify(postData))
+
+
+    class AppModel extends Events
+
+        constructor: (profile) ->
+            super()
+            @data =
                 context: ''
+            @profile = profile
 
             @apiKey = '6c612e594d5a32557748352e6b496a6a5031492f6631634c4f6d6d682e7674375635552f6e48304b667a37'
             @url = 'https://api.apigw.smt.docomo.ne.jp/dialogue/v1/dialogue?APIKEY=' + @apiKey
@@ -22,22 +73,18 @@ do (win = window, doc = window.document) ->
 
         initialize: ->
 
+            @synth = new SpeechSynth()
+            @synth.on('synth', (blob) =>
+                @emit('ready', blob)
+            )
+
+            @voice = new AudioPlayer()
+            @voice.on('ended', (e) =>
+                @emit('finished', e, @data.utt)
+            )
+
         fetch: (text) ->
-            postData =
-                utt: text
-                context: @data.context
-                nickname: 'いそっぷ'
-                nickname_y: 'イソップ'
-                sex: '男'
-                bloodtype: 'A'
-                birthdateY: '1985'
-                birthdateM: '4'
-                birthdateD: '1'
-                age: '30'
-                constellations: '牡羊座'
-                place: '横浜'
-                mode: 'dialog'
-                t: ''
+            postData = _.extend(@profile, { utt: text, context: @data.context })
 
             $.ajax(
                 type: 'post'
@@ -49,6 +96,46 @@ do (win = window, doc = window.document) ->
                 @data = data
                 @emit('fetch', data)
             )
+
+        think: (text) ->
+            console.log @profile.sex
+            if @profile.sex is "女"
+                sex = '0'
+            else if @profile.sex is "男"
+                sex = '1'
+
+            @synth.synth(@data.utt, sex)
+
+        say: (blob) ->
+            @voice.set(blob).play()
+
+
+
+    class AudioPlayer extends Events
+
+        constructor: ->
+
+            @initialize()
+
+        initialize: ->
+
+            @audio = new Audio()
+            @audio.addEventListener('ended', (e) =>
+                @emit('ended', e)
+            , false)
+
+        getAudio: ->
+            return @audio
+
+        set: (blob) ->
+            URL = window.URL || window.webkitURL
+            @audio.src = URL.createObjectURL(blob)
+            @
+
+        play: ->
+            @audio.play()
+            @
+
 
     ###
     # View
@@ -97,20 +184,74 @@ do (win = window, doc = window.document) ->
                 @input.value = ''
             , false)
 
+
+
     ###
     # Entry Point
     ###
     chatView = new ChatView()
     inputView = new InputView()
-    model = new AppModel()
+
+    male = new AppModel(
+        nickname: 'いそっぷ'
+        nickname_y: 'イソップ'
+        sex: '男'
+        bloodtype: 'A'
+        birthdateY: '1985'
+        birthdateM: '4'
+        birthdateD: '1'
+        age: '30'
+        constellations: '牡羊座'
+        place: '横浜'
+        mode: 'dialog'
+        t: '30'
+    )
+    female = new AppModel(
+        nickname: 'いそっぷ'
+        nickname_y: 'イソップ'
+        sex: '女'
+        bloodtype: 'A'
+        birthdateY: '1985'
+        birthdateM: '3'
+        birthdateD: '19'
+        age: '30'
+        constellations: '牡羊座'
+        place: '東京'
+        mode: 'dialog'
+        t: ''
+    )
 
     inputView.on('submit', (e) ->
         chatView.add(e)
-        model.fetch(e)
+        male.fetch(e)
     )
-    model.on('fetch', (data) ->
-        chatView.add(data.utt)
-        inputView.input.focus()
+
+    # 会話を取得後
+    male.on('fetch', (data) ->
+        console.log 'male fetch'
+        male.think(data.utt)
     )
-    model.fetch()
+    female.on('fetch', (data) ->
+        console.log 'female fetch'
+        female.think(data.utt)
+    )
+
+    # 会話開始
+    male.on('ready', (blob) ->
+        male.say(blob)
+        chatView.add(male.data.utt)
+    )
+    female.on('ready', (blob) ->
+        female.say(blob)
+        chatView.add(female.data.utt)
+    )
+
+    # 話し終わった
+    male.on('finished', (e, utt) ->
+        female.fetch(utt)
+    )
+    female.on('finished', (e, utt) ->
+        male.fetch(utt)
+    )
+
 
