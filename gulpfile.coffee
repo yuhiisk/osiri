@@ -12,7 +12,7 @@ runSequence = require 'run-sequence'
 browserSync = require 'browser-sync'
 reload = browserSync.reload
 
-gulp.task 'build', ['styles', 'coffeelint', 'coffee']
+gulp.task 'build', ['styles', 'coffeelint', 'browserify']
 
 # Watch Files For Changes & Reload
 gulp.task 'serve', () ->
@@ -32,7 +32,7 @@ gulp.task 'serve', () ->
     gulp.watch([config.path.scss + '**/*.{scss,rb}'], ['styles', reload])
     # gulp.watch([config.path.js + '**/*.js'], [reload])
     gulp.watch([config.path.jade + '**.jade'], ['jade', reload])
-    gulp.watch([config.path.coffee + '**/*.coffee'], ['coffeelint', 'coffee', reload])
+    gulp.watch([config.path.coffee + '**/*.coffee'], ['coffeelint', 'browserify', reload])
 
 
 # Build Production Files, the Default Task
