@@ -1,43 +1,611 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-var $;
+var $, Events,
+  extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
+  hasProp = {}.hasOwnProperty;
 
 $ = require('./jquery.js');
 
+Events = require('events').EventEmitter;
+
 (function(win, doc) {
   'use strict';
-  var AppModel, model;
-  AppModel = (function() {
-    function AppModel() {
+  var AppModel, AudioPlayer, CONTEXT, ChatView, InputView, SpeechSynth, chatView, female, inputView, male;
+  CONTEXT = '';
+
+  /*
+   * Model
+   */
+  SpeechSynth = (function(superClass) {
+    extend(SpeechSynth, superClass);
+
+    function SpeechSynth() {
+      SpeechSynth.__super__.constructor.call(this);
+      this.data = {
+        blob: null
+      };
       this.apiKey = '6c612e594d5a32557748352e6b496a6a5031492f6631634c4f6d6d682e7674375635552f6e48304b667a37';
-      this.url = 'https://api.apigw.smt.docomo.ne.jp/dialogue/v1/dialogue?APIKEY=' + this.apiKey;
+      this.url = 'https://api.apigw.smt.docomo.ne.jp/virtualNarrator/v1/textToSpeech?APIKEY=' + this.apiKey;
       this.initialize();
     }
 
-    AppModel.prototype.initialize = function(name) {
-      this.name = name != null ? name : 'Hello World!';
-      return this.fetch('こんにちは');
+    SpeechSynth.prototype.initialize = function() {};
+
+    SpeechSynth.prototype.synth = function(text, sex) {
+      var postData, self, xhr;
+      self = this;
+      postData = {
+        Command: "AP_Synth",
+        TextData: text,
+        SpeakerID: sex,
+        SpeechRate: '1.00',
+        PowerRate: '1.00',
+        VoiceType: '0',
+        AudioFileFormat: '0'
+      };
+      xhr = new XMLHttpRequest();
+      xhr.open('POST', this.url, true);
+      xhr.responseType = 'arraybuffer';
+      xhr.setRequestHeader("Content-Type", "application/json; charset=utf-8");
+      xhr.onload = function() {
+        var blob, view;
+        if (this.readyState === 4 && this.status === 200) {
+          view = new Uint8Array(this.response);
+          blob = new Blob([view], {
+            "type": "audio/wav"
+          });
+          self.data.blob = blob;
+          return self.emit('synth', blob);
+        }
+      };
+      return xhr.send(JSON.stringify(postData));
+    };
+
+    return SpeechSynth;
+
+  })(Events);
+  AppModel = (function(superClass) {
+    extend(AppModel, superClass);
+
+    function AppModel(profile, special) {
+      AppModel.__super__.constructor.call(this);
+      this.data = {
+        context: ''
+      };
+      this.profile = profile;
+      this.special = _.shuffle(special);
+      this.apiKey = '6c612e594d5a32557748352e6b496a6a5031492f6631634c4f6d6d682e7674375635552f6e48304b667a37';
+      this.url = 'https://api.apigw.smt.docomo.ne.jp/dialogue/v1/dialogue?APIKEY=' + this.apiKey;
+      this.count = 0;
+      this.max = 3;
+      this.initialize();
+    }
+
+    AppModel.prototype.initialize = function() {
+      this.synth = new SpeechSynth();
+      this.synth.on('synth', (function(_this) {
+        return function(blob) {
+          return _this.emit('ready', blob);
+        };
+      })(this));
+      this.voice = new AudioPlayer();
+      return this.voice.on('ended', (function(_this) {
+        return function(e) {
+          return _this.emit('finished', e, _this.data.utt);
+        };
+      })(this));
     };
 
     AppModel.prototype.fetch = function(text) {
-      return $.ajax({
-        type: 'POST',
-        url: this.url,
-        dataType: 'json',
-        data: {
-          utt: text
-        }
+      var postData;
+      postData = _.extend(this.profile, {
+        utt: text,
+        context: CONTEXT
       });
+      return $.ajax({
+        type: 'post',
+        url: this.url,
+        contentType: 'application/json; charset=utf-8',
+        dataType: 'json',
+        data: JSON.stringify(postData)
+      }).done((function(_this) {
+        return function(data) {
+          _this.data = data;
+          CONTEXT = data.context;
+          return _this.emit('fetch', data);
+        };
+      })(this));
+    };
+
+    AppModel.prototype.think = function(text) {
+      var sex;
+      console.log(this.profile.sex);
+      if (this.profile.sex === "女") {
+        sex = '0';
+      } else if (this.profile.sex === "男") {
+        sex = '1';
+      }
+      this.count++;
+      if (this.count === 3 && this.special.length > 0) {
+        this.count = 0;
+        text = this.special[this.rand(1, this.special.length)];
+        this.data.utt = text;
+        CONTEXT = '';
+      }
+      return this.synth.synth(this.data.utt, sex);
+    };
+
+    AppModel.prototype.say = function(blob) {
+      return this.voice.set(blob).play();
+    };
+
+    AppModel.prototype.rand = function(min, max) {
+      return min + Math.floor(Math.random() * (max + 1 - min));
     };
 
     return AppModel;
 
-  })();
-  return model = new AppModel();
+  })(Events);
+  AudioPlayer = (function(superClass) {
+    extend(AudioPlayer, superClass);
+
+    function AudioPlayer() {
+      this.initialize();
+    }
+
+    AudioPlayer.prototype.initialize = function() {
+      this.audio = new Audio();
+      return this.audio.addEventListener('ended', (function(_this) {
+        return function(e) {
+          return _this.emit('ended', e);
+        };
+      })(this), false);
+    };
+
+    AudioPlayer.prototype.getAudio = function() {
+      return this.audio;
+    };
+
+    AudioPlayer.prototype.set = function(blob) {
+      var URL;
+      URL = window.URL || window.webkitURL;
+      this.audio.src = URL.createObjectURL(blob);
+      return this;
+    };
+
+    AudioPlayer.prototype.play = function() {
+      this.audio.play();
+      return this;
+    };
+
+    return AudioPlayer;
+
+  })(Events);
+
+  /*
+   * View
+   */
+  ChatView = (function(superClass) {
+    extend(ChatView, superClass);
+
+    function ChatView(id) {
+      if (id == null) {
+        id = 'Chat';
+      }
+      this.el = doc.getElementById(id);
+      this.initialize();
+    }
+
+    ChatView.prototype.initialize = function() {};
+
+    ChatView.prototype.add = function(text) {
+      var p, textNode;
+      p = doc.createElement('p');
+      textNode = doc.createTextNode(text);
+      p.appendChild(textNode);
+      return this.el.appendChild(p);
+    };
+
+    return ChatView;
+
+  })(Events);
+  InputView = (function(superClass) {
+    extend(InputView, superClass);
+
+    function InputView(id) {
+      if (id == null) {
+        id = 'Control';
+      }
+      this.el = doc.getElementById(id);
+      this.input = this.el.querySelector('.control__input');
+      this.submit = this.el.querySelector('.control__submit');
+      this.initialize();
+      this.eventify();
+    }
+
+    InputView.prototype.initialize = function() {
+      return this.input.value = '';
+    };
+
+    InputView.prototype.eventify = function() {
+      return this.submit.addEventListener('click', (function(_this) {
+        return function(e) {
+          _this.emit('submit', _this.input.value);
+          return _this.input.value = '';
+        };
+      })(this), false);
+    };
+
+    return InputView;
+
+  })(Events);
+
+  /*
+   * Entry Point
+   */
+  chatView = new ChatView();
+  inputView = new InputView();
+  male = new AppModel({
+    nickname: 'いそっぷ',
+    nickname_y: 'イソップ',
+    sex: '男',
+    bloodtype: 'A',
+    birthdateY: '1985',
+    birthdateM: '4',
+    birthdateD: '1',
+    age: '30',
+    constellations: '牡羊座',
+    place: '横浜',
+    mode: 'dialog',
+    t: '30'
+  }, ['好きです', 'どうして、そんなにおれの好きな顔に生まれてきたの？', 'たまには俺にリードさせてくださいよ。', 'カナちゃんが彼女になってよ。', 'いいから俺についてこい。', '俺にしとけば？', 'もう、ほっとけないなー。', '守ってあげたいタイプってよく言われない？', '僕のものになってください！', '毎朝俺のために味噌汁を作ってください。', '俺と夜の大運動会で棒入れをしないかい？']);
+  female = new AppModel({
+    nickname: '倉科カナ',
+    nickname_y: 'カナチャン',
+    sex: '女',
+    bloodtype: 'A',
+    birthdateY: '1985',
+    birthdateM: '3',
+    birthdateD: '19',
+    age: '30',
+    constellations: '牡羊座',
+    place: '東京',
+    mode: 'dialog',
+    t: ''
+  }, []);
+  inputView.on('submit', function(e) {
+    chatView.add(e);
+    return male.fetch(e);
+  });
+  male.on('fetch', function(data) {
+    console.log('male fetch');
+    return male.think(data.utt);
+  });
+  female.on('fetch', function(data) {
+    console.log('female fetch');
+    return female.think(data.utt);
+  });
+  male.on('ready', function(blob) {
+    male.say(blob);
+    return chatView.add(male.data.utt);
+  });
+  female.on('ready', function(blob) {
+    female.say(blob);
+    return chatView.add(female.data.utt);
+  });
+  male.on('finished', function(e, utt) {
+    return female.fetch(utt);
+  });
+  return female.on('finished', function(e, utt) {
+    return male.fetch(utt);
+  });
 })(window, window.document);
 
 
 
-},{"./jquery.js":2}],2:[function(require,module,exports){
+},{"./jquery.js":3,"events":2}],2:[function(require,module,exports){
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+function EventEmitter() {
+  this._events = this._events || {};
+  this._maxListeners = this._maxListeners || undefined;
+}
+module.exports = EventEmitter;
+
+// Backwards-compat with node 0.10.x
+EventEmitter.EventEmitter = EventEmitter;
+
+EventEmitter.prototype._events = undefined;
+EventEmitter.prototype._maxListeners = undefined;
+
+// By default EventEmitters will print a warning if more than 10 listeners are
+// added to it. This is a useful default which helps finding memory leaks.
+EventEmitter.defaultMaxListeners = 10;
+
+// Obviously not all Emitters should be limited to 10. This function allows
+// that to be increased. Set to zero for unlimited.
+EventEmitter.prototype.setMaxListeners = function(n) {
+  if (!isNumber(n) || n < 0 || isNaN(n))
+    throw TypeError('n must be a positive number');
+  this._maxListeners = n;
+  return this;
+};
+
+EventEmitter.prototype.emit = function(type) {
+  var er, handler, len, args, i, listeners;
+
+  if (!this._events)
+    this._events = {};
+
+  // If there is no 'error' event listener then throw.
+  if (type === 'error') {
+    if (!this._events.error ||
+        (isObject(this._events.error) && !this._events.error.length)) {
+      er = arguments[1];
+      if (er instanceof Error) {
+        throw er; // Unhandled 'error' event
+      }
+      throw TypeError('Uncaught, unspecified "error" event.');
+    }
+  }
+
+  handler = this._events[type];
+
+  if (isUndefined(handler))
+    return false;
+
+  if (isFunction(handler)) {
+    switch (arguments.length) {
+      // fast cases
+      case 1:
+        handler.call(this);
+        break;
+      case 2:
+        handler.call(this, arguments[1]);
+        break;
+      case 3:
+        handler.call(this, arguments[1], arguments[2]);
+        break;
+      // slower
+      default:
+        len = arguments.length;
+        args = new Array(len - 1);
+        for (i = 1; i < len; i++)
+          args[i - 1] = arguments[i];
+        handler.apply(this, args);
+    }
+  } else if (isObject(handler)) {
+    len = arguments.length;
+    args = new Array(len - 1);
+    for (i = 1; i < len; i++)
+      args[i - 1] = arguments[i];
+
+    listeners = handler.slice();
+    len = listeners.length;
+    for (i = 0; i < len; i++)
+      listeners[i].apply(this, args);
+  }
+
+  return true;
+};
+
+EventEmitter.prototype.addListener = function(type, listener) {
+  var m;
+
+  if (!isFunction(listener))
+    throw TypeError('listener must be a function');
+
+  if (!this._events)
+    this._events = {};
+
+  // To avoid recursion in the case that type === "newListener"! Before
+  // adding it to the listeners, first emit "newListener".
+  if (this._events.newListener)
+    this.emit('newListener', type,
+              isFunction(listener.listener) ?
+              listener.listener : listener);
+
+  if (!this._events[type])
+    // Optimize the case of one listener. Don't need the extra array object.
+    this._events[type] = listener;
+  else if (isObject(this._events[type]))
+    // If we've already got an array, just append.
+    this._events[type].push(listener);
+  else
+    // Adding the second element, need to change to array.
+    this._events[type] = [this._events[type], listener];
+
+  // Check for listener leak
+  if (isObject(this._events[type]) && !this._events[type].warned) {
+    var m;
+    if (!isUndefined(this._maxListeners)) {
+      m = this._maxListeners;
+    } else {
+      m = EventEmitter.defaultMaxListeners;
+    }
+
+    if (m && m > 0 && this._events[type].length > m) {
+      this._events[type].warned = true;
+      console.error('(node) warning: possible EventEmitter memory ' +
+                    'leak detected. %d listeners added. ' +
+                    'Use emitter.setMaxListeners() to increase limit.',
+                    this._events[type].length);
+      if (typeof console.trace === 'function') {
+        // not supported in IE 10
+        console.trace();
+      }
+    }
+  }
+
+  return this;
+};
+
+EventEmitter.prototype.on = EventEmitter.prototype.addListener;
+
+EventEmitter.prototype.once = function(type, listener) {
+  if (!isFunction(listener))
+    throw TypeError('listener must be a function');
+
+  var fired = false;
+
+  function g() {
+    this.removeListener(type, g);
+
+    if (!fired) {
+      fired = true;
+      listener.apply(this, arguments);
+    }
+  }
+
+  g.listener = listener;
+  this.on(type, g);
+
+  return this;
+};
+
+// emits a 'removeListener' event iff the listener was removed
+EventEmitter.prototype.removeListener = function(type, listener) {
+  var list, position, length, i;
+
+  if (!isFunction(listener))
+    throw TypeError('listener must be a function');
+
+  if (!this._events || !this._events[type])
+    return this;
+
+  list = this._events[type];
+  length = list.length;
+  position = -1;
+
+  if (list === listener ||
+      (isFunction(list.listener) && list.listener === listener)) {
+    delete this._events[type];
+    if (this._events.removeListener)
+      this.emit('removeListener', type, listener);
+
+  } else if (isObject(list)) {
+    for (i = length; i-- > 0;) {
+      if (list[i] === listener ||
+          (list[i].listener && list[i].listener === listener)) {
+        position = i;
+        break;
+      }
+    }
+
+    if (position < 0)
+      return this;
+
+    if (list.length === 1) {
+      list.length = 0;
+      delete this._events[type];
+    } else {
+      list.splice(position, 1);
+    }
+
+    if (this._events.removeListener)
+      this.emit('removeListener', type, listener);
+  }
+
+  return this;
+};
+
+EventEmitter.prototype.removeAllListeners = function(type) {
+  var key, listeners;
+
+  if (!this._events)
+    return this;
+
+  // not listening for removeListener, no need to emit
+  if (!this._events.removeListener) {
+    if (arguments.length === 0)
+      this._events = {};
+    else if (this._events[type])
+      delete this._events[type];
+    return this;
+  }
+
+  // emit removeListener for all listeners on all events
+  if (arguments.length === 0) {
+    for (key in this._events) {
+      if (key === 'removeListener') continue;
+      this.removeAllListeners(key);
+    }
+    this.removeAllListeners('removeListener');
+    this._events = {};
+    return this;
+  }
+
+  listeners = this._events[type];
+
+  if (isFunction(listeners)) {
+    this.removeListener(type, listeners);
+  } else {
+    // LIFO order
+    while (listeners.length)
+      this.removeListener(type, listeners[listeners.length - 1]);
+  }
+  delete this._events[type];
+
+  return this;
+};
+
+EventEmitter.prototype.listeners = function(type) {
+  var ret;
+  if (!this._events || !this._events[type])
+    ret = [];
+  else if (isFunction(this._events[type]))
+    ret = [this._events[type]];
+  else
+    ret = this._events[type].slice();
+  return ret;
+};
+
+EventEmitter.listenerCount = function(emitter, type) {
+  var ret;
+  if (!emitter._events || !emitter._events[type])
+    ret = 0;
+  else if (isFunction(emitter._events[type]))
+    ret = 1;
+  else
+    ret = emitter._events[type].length;
+  return ret;
+};
+
+function isFunction(arg) {
+  return typeof arg === 'function';
+}
+
+function isNumber(arg) {
+  return typeof arg === 'number';
+}
+
+function isObject(arg) {
+  return typeof arg === 'object' && arg !== null;
+}
+
+function isUndefined(arg) {
+  return arg === void 0;
+}
+
+},{}],3:[function(require,module,exports){
 /*!
  * jQuery JavaScript Library v2.1.4
  * http://jquery.com/
