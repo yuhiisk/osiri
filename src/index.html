@@ -21,8 +21,9 @@
     <script src="assets/js/lib/modernizr.min.js"></script>
   </head>
   <body>
-    <div id="Control" class="control"><input id="Input" class="control__input" type="text"> <input type="button" class="control__submit" value="決定"></div>
+    <div id="Control" class="control">お題: <input id="Input" class="control__input" type="text"> <input type="button" class="control__submit" value="決定"></div>
     <div id="Chat" class=""></div>
+    <form name="post-form" action="https://api.apigw.smt.docomo.ne.jp/voiceText/v1/textToSpeech" method="post"></form>
 
     <script src="assets/js/lib/lodash.min.js"></script>
     <script src="assets/js/script.js"></script>
