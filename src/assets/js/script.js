@@ -24,35 +24,13 @@ Events = require('events').EventEmitter;
         blob: null
       };
       this.apiKey = '6c612e594d5a32557748352e6b496a6a5031492f6631634c4f6d6d682e7674375635552f6e48304b667a37';
-<<<<<<< HEAD
-      this.url = 'https://api.apigw.smt.docomo.ne.jp/virtualNarrator/v1/textToSpeech?APIKEY=' + this.apiKey;
-=======
       this.url = 'https://api.apigw.smt.docomo.ne.jp/voiceText/v1/textToSpeech?APIKEY=' + this.apiKey;
       this.form = doc.forms['post-form'];
->>>>>>> master
       this.initialize();
     }
 
     SpeechSynth.prototype.initialize = function() {};
 
-<<<<<<< HEAD
-    SpeechSynth.prototype.synth = function(text, sex) {
-      var postData, self, xhr;
-      self = this;
-      postData = {
-        Command: "AP_Synth",
-        TextData: text,
-        SpeakerID: sex,
-        SpeechRate: '1.00',
-        PowerRate: '1.00',
-        VoiceType: '0',
-        AudioFileFormat: '0'
-      };
-      xhr = new XMLHttpRequest();
-      xhr.open('POST', this.url, true);
-      xhr.responseType = 'arraybuffer';
-      xhr.setRequestHeader("Content-Type", "application/json; charset=utf-8");
-=======
     SpeechSynth.prototype.synth = function(text, chara) {
       var postData, self, xhr;
       self = this;
@@ -66,7 +44,6 @@ Events = require('events').EventEmitter;
       };
       xhr = new XMLHttpRequest();
       xhr.responseType = 'arraybuffer';
->>>>>>> master
       xhr.onload = function() {
         var blob, view;
         if (this.readyState === 4 && this.status === 200) {
@@ -78,16 +55,12 @@ Events = require('events').EventEmitter;
           return self.emit('synth', blob);
         }
       };
-<<<<<<< HEAD
-      return xhr.send(JSON.stringify(postData));
-=======
       xhr.onerror = function(e) {
         return console.log('XHR ERROR: ', e);
       };
       xhr.open('POST', this.url);
       xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
       return xhr.send($.param(postData));
->>>>>>> master
     };
 
     return SpeechSynth;
@@ -147,16 +120,6 @@ Events = require('events').EventEmitter;
     };
 
     AppModel.prototype.think = function(text) {
-<<<<<<< HEAD
-      var sex;
-      console.log(this.profile.sex);
-      if (this.profile.sex === "女") {
-        sex = '0';
-      } else if (this.profile.sex === "男") {
-        sex = '1';
-      }
-=======
->>>>>>> master
       this.count++;
       if (this.count === 3 && this.special.length > 0) {
         this.count = 0;
@@ -164,11 +127,7 @@ Events = require('events').EventEmitter;
         this.data.utt = text;
         CONTEXT = '';
       }
-<<<<<<< HEAD
-      return this.synth.synth(this.data.utt, sex);
-=======
       return this.synth.synth(this.data.utt, this.profile.chara);
->>>>>>> master
     };
 
     AppModel.prototype.say = function(blob) {
@@ -285,10 +244,7 @@ Events = require('events').EventEmitter;
     nickname: 'いそっぷ',
     nickname_y: 'イソップ',
     sex: '男',
-<<<<<<< HEAD
-=======
     chara: 'santa',
->>>>>>> master
     bloodtype: 'A',
     birthdateY: '1985',
     birthdateM: '4',
@@ -297,21 +253,13 @@ Events = require('events').EventEmitter;
     constellations: '牡羊座',
     place: '横浜',
     mode: 'dialog',
-<<<<<<< HEAD
-    t: '30'
-  }, ['好きです', 'どうして、そんなにおれの好きな顔に生まれてきたの？', 'たまには俺にリードさせてくださいよ。', 'カナちゃんが彼女になってよ。', 'いいから俺についてこい。', '俺にしとけば？', 'もう、ほっとけないなー。', '守ってあげたいタイプってよく言われない？', '僕のものになってください！', '毎朝俺のために味噌汁を作ってください。', '俺と夜の大運動会で棒入れをしないかい？']);
-=======
     t: ''
   }, ['大丈夫だって安心しろよ～', '先輩！何してんすか！やめてくださいよ本当に！', 'ぱっかーーーん']);
->>>>>>> master
   female = new AppModel({
     nickname: '倉科カナ',
     nickname_y: 'カナチャン',
     sex: '女',
-<<<<<<< HEAD
-=======
     chara: 'bear',
->>>>>>> master
     bloodtype: 'A',
     birthdateY: '1985',
     birthdateM: '3',
